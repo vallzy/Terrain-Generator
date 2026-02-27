@@ -1,0 +1,27 @@
+```yaml
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers when you push a tag like v1.0.0
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 6.0.x # Or your specific version
+    - name: Build
+      run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish
+    - name: Zip Release
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./RadiantTerrainGen.zip
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: RadiantTerrainGen.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
