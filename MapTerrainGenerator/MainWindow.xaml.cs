@@ -23,9 +23,13 @@ namespace MapTerrainGeneratorWPF
         private BrushData _lastTargetBrush = null;
         private string[] _lastOriginalLines = null;
 
+        private ConfigSettings _appSettings;
+
         public MainWindow()
         {
             InitializeComponent();
+            _appSettings = ConfigSettings.Load();
+            ApplySettings();
         }
 
         private void Log(string msg)
@@ -35,9 +39,40 @@ namespace MapTerrainGeneratorWPF
             txtLog.ScrollToEnd();
         }
 
+        private void ApplySettings()
+        {
+            cmbTargetMode.SelectedIndex = _appSettings.DefaultTargetMode;
+            cmbNoiseType.SelectedIndex = _appSettings.DefaultNoiseType;
+            UpdateDynamicVisibility();
+            UpdateDefaultMapName();
+        }
+
+        private void MenuConfig_Click(object sender, RoutedEventArgs e)
+        {
+            var configWin = new ConfigWindow(_appSettings);
+            configWin.Owner = this;
+            if (configWin.ShowDialog() == true)
+            {
+                _appSettings = configWin.Settings;
+                ApplySettings();
+                Log("Configuration updated and saved.");
+            }
+        }
+
+        private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
+
+        private void MenuGithub_Click(object sender, RoutedEventArgs e)
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://github.com/vallzy/Terrain-Generator/issues",
+                UseShellExecute = true
+            });
+        }
+
         private void BtnBrowse_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog ofd = new OpenFileDialog { Filter = "Map Files (*.map)|*.map" };
+            var ofd = new Microsoft.Win32.OpenFileDialog { Filter = "Map Files (*.map)|*.map" };
             if (ofd.ShowDialog() == true) txtFile.Text = ofd.FileName;
         }
 
@@ -67,7 +102,7 @@ namespace MapTerrainGeneratorWPF
             if (cmbTargetMode.SelectedIndex == 0)
                 txtMapName.Text = !string.IsNullOrWhiteSpace(txtFile.Text) ? "output_" + Path.GetFileNameWithoutExtension(txtFile.Text) : "output_terrain";
             else
-                if (txtMapName.Text.StartsWith("output_") || string.IsNullOrWhiteSpace(txtMapName.Text)) txtMapName.Text = "terrain_output";
+                if (string.IsNullOrWhiteSpace(txtMapName.Text) || txtMapName.Text.StartsWith("output_")) txtMapName.Text = "terrain_output";
         }
 
         private void CmbTargetMode_SelectionChanged(object sender, SelectionChangedEventArgs e) { UpdateDynamicVisibility(); UpdateDefaultMapName(); InvalidateExport(); }
@@ -126,45 +161,35 @@ namespace MapTerrainGeneratorWPF
         private void BtnGenerate_Click(object sender, RoutedEventArgs e)
         {
             txtLog.Clear(); btnExport.IsEnabled = false;
-            _lastGeneratedFuncGroup = null; _lastTargetBrush = null; _lastOriginalLines = null;
 
             string mode = cmbTargetMode.SelectedIndex == 0 ? "hint" : "manual";
-            string[] originalLines = new string[0];
-            if (mode == "hint")
-            {
-                if (!File.Exists(txtFile.Text)) { Log("Error: Select a valid .map file."); return; }
-                originalLines = File.ReadAllLines(txtFile.Text);
-            }
+            string[] originalLines = mode == "hint" && File.Exists(txtFile.Text) ? File.ReadAllLines(txtFile.Text) : new string[0];
+
+            if (mode == "hint" && originalLines.Length == 0) { Log("Error: Select a valid .map file."); return; }
 
             if (!double.TryParse(txtGenWidth.Text, out double w) || !double.TryParse(txtGenLength.Text, out double l) || !double.TryParse(txtGenHeight.Text, out double h)) return;
-            if (!TryGetSubSquareSizes(out double stepX, out double stepY)) return;
 
-            string rawFrequency = cmbFrequency.Text.Split(' ')[0];
-            double shapeHeight = 0;
-            if (cmbShapeType.SelectedIndex > 0 && !double.TryParse(txtShapeHeight.Text, out shapeHeight)) { Log("Error: Invalid Shape Height."); return; }
-            if (!double.TryParse(txtTerrace.Text, out double terraceStep) || !double.TryParse(txtVariance.Text, out double variance) || !double.TryParse(rawFrequency, out double frequency)) return;
+            double stepX = 64, stepY = 64;
+            if (chkAdvancedSubSquare.IsChecked == true) { double.TryParse(txtSizeX.Text, out stepX); double.TryParse(txtSizeY.Text, out stepY); }
+            else { if (cmbSubSquarePreset.SelectedItem is ComboBoxItem item) double.TryParse(item.Content.ToString(), out stepX); stepY = stepX; }
 
-            string topTexture = string.IsNullOrWhiteSpace(txtTexture.Text) ? "common/caulk" : txtTexture.Text;
-            int shapeType = cmbShapeType.SelectedIndex;
-            int noiseType = cmbNoiseType.SelectedIndex;
+            double shapeHeight = 0; double.TryParse(txtShapeHeight.Text, out shapeHeight);
+            double terrace = 0; double.TryParse(txtTerrace.Text, out terrace);
+            double variance = 0; double.TryParse(txtVariance.Text, out variance);
+            double frequency = 0.005; double.TryParse(cmbFrequency.Text.Split(' ')[0], out frequency);
 
-            // USE NEW TERRAIN ENGINE
             var target = TerrainEngine.GetTargetBrushData(mode, originalLines, w, l, h, Log);
             if (target == null) return;
 
             TerrainEngine.AdjustBoundsToFitGrid(target, stepX, stepY, Log);
-            Log($"Final Terrain Grid: {target.WidthX}x{target.LengthY} | Step Size: X:{stepX} Y:{stepY}");
+            var heightMap = TerrainEngine.GenerateHeightMap(target, stepX, stepY, cmbShapeType.SelectedIndex, shapeHeight, variance, frequency, cmbNoiseType.SelectedIndex, terrace);
 
-            bool splitDiagonally = variance > 0 || shapeType > 0;
-            var heightMap = TerrainEngine.GenerateHeightMap(target, stepX, stepY, shapeType, shapeHeight, variance, frequency, noiseType, terraceStep);
-
-            _lastGeneratedFuncGroup = TerrainEngine.GenerateFuncGroup(target, stepX, stepY, splitDiagonally, topTexture, heightMap);
+            _lastGeneratedFuncGroup = TerrainEngine.GenerateFuncGroup(target, stepX, stepY, (variance > 0 || cmbShapeType.SelectedIndex > 0), txtTexture.Text, heightMap);
             _lastTargetBrush = target;
             _lastOriginalLines = originalLines;
 
             Build3DMesh(target, stepX, stepY, heightMap, shapeHeight);
-
-            Log("Terrain generated successfully. Ready to export.");
+            Log("Terrain generated successfully.");
             btnExport.IsEnabled = true;
         }
 
@@ -206,9 +231,25 @@ namespace MapTerrainGeneratorWPF
 
         private void BtnExport_Click(object sender, RoutedEventArgs e)
         {
-            if (_lastGeneratedFuncGroup == null) return;
+            if (_lastGeneratedFuncGroup == null || _lastTargetBrush == null || _lastOriginalLines == null)
+            {
+                Log("Error: Nothing to export. Please successfully generate the terrain first.");
+                return;
+            }
+
             string mode = cmbTargetMode.SelectedIndex == 0 ? "hint" : "manual";
-            TerrainEngine.ExportFile(mode, _lastOriginalLines, _lastTargetBrush, _lastGeneratedFuncGroup, txtFile.Text, txtMapName.Text, chkOverrideMap.IsChecked == true, Log);
+
+            TerrainEngine.ExportFile(
+                mode,                           
+                _lastOriginalLines,             
+                _lastTargetBrush,              
+                _lastGeneratedFuncGroup,        
+                txtFile.Text,                  
+                txtMapName.Text,                
+                chkOverrideMap.IsChecked == true, 
+                _appSettings.OutputFolder,      
+                Log                            
+            );
         }
 
         private void ChkWireframe_Changed(object sender, RoutedEventArgs e) { UpdateMaterial(); }

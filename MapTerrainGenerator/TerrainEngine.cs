@@ -40,7 +40,7 @@ namespace MapTerrainGeneratorWPF
                 var heightMap = GenerateHeightMap(target, stepX, stepY, shapeType, shapeHeight, variance, frequency, noiseType, terraceStep);
                 string newFuncGroup = GenerateFuncGroup(target, stepX, stepY, splitDiagonally, topTexture, heightMap);
 
-                return ExportFile(mode, originalLines, target, newFuncGroup, filePath, outputName, overrideMap, log);
+                return ExportFile(mode, originalLines, target, newFuncGroup, filePath, outputName, overrideMap, "", log);
             }
             catch (Exception ex)
             {
@@ -204,12 +204,24 @@ namespace MapTerrainGeneratorWPF
             return sb.ToString().TrimEnd();
         }
 
-        public static bool ExportFile(string mode, string[] originalLines, BrushData target, string newFuncGroup, string sourceFilePath, string outName, bool overrideMap, Action<string> log)
-        {
+        public static bool ExportFile(
+         string mode,
+         string[] originalLines,
+         BrushData target,
+         string newFuncGroup,
+         string sourceFilePath,
+         string outName,
+         bool overrideMap,
+         string configOutputFolder, 
+         Action<string> log)       
+            {
             try
             {
                 List<string> newFileLines = new List<string>();
-                string outputFilePath;
+                string outputFilePath = "";
+                string baseFolder = string.IsNullOrWhiteSpace(configOutputFolder)
+                    ? AppDomain.CurrentDomain.BaseDirectory
+                    : configOutputFolder;
 
                 if (mode.ToLower() == "hint" && target.StartLineIndex != -1)
                 {
@@ -230,16 +242,18 @@ namespace MapTerrainGeneratorWPF
                 }
                 else
                 {
+                    // Manual Mode or New File
                     string fileName = string.IsNullOrWhiteSpace(outName) ? "terrain_output.map" : outName;
                     if (!fileName.EndsWith(".map", StringComparison.OrdinalIgnoreCase)) fileName += ".map";
-                    outputFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+
+                    outputFilePath = Path.Combine(baseFolder, fileName);
 
                     newFileLines.Add("// entity 0\n{\n\"classname\" \"worldspawn\"\n}");
                     newFileLines.Add("\n" + newFuncGroup);
                 }
 
                 File.WriteAllLines(outputFilePath, newFileLines);
-                log($"SUCCESS! Map saved to: {outputFilePath}");
+                log($"SUCCESS! Map saved to:\n{outputFilePath}");
                 return true;
             }
             catch (Exception ex)
@@ -353,7 +367,7 @@ namespace MapTerrainGeneratorWPF
     public static class Simplex
     {
         private static readonly int[] perm = new int[512];
-        private static readonly int[] p = { /* (Truncated for readability - paste your original Simplex p array here) */ 
+        private static readonly int[] p = { 
             151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
             190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
             77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,
