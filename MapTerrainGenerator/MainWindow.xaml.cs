@@ -272,18 +272,73 @@ namespace MapTerrainGeneratorWPF
             }
         }
 
-        private void Viewport_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e) { _isDragging = true; _lastMousePosition = e.GetPosition(this); ((UIElement)sender).CaptureMouse(); }
+        private void Viewport_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ClickCount == 2)
+            {
+                if (_previewModel != null)
+                {
+                    Rect3D bounds = _previewModel.Bounds;
+                    _camTarget = new Point3D(bounds.X + bounds.SizeX / 2, bounds.Y + bounds.SizeY / 2, bounds.Z + bounds.SizeZ / 2);
+                    _camRadius = Math.Max(bounds.SizeX, bounds.SizeY) * 1.5;
+                    UpdateCamera();
+                    return;
+                }
+            }
+
+            _isDragging = true;
+            _lastMousePosition = e.GetPosition(this);
+            ((UIElement)sender).CaptureMouse();
+        }
+
         private void Viewport_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e) { _isDragging = false; ((UIElement)sender).ReleaseMouseCapture(); }
         private void Viewport_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
         {
             if (!_isDragging) return;
+
             Point currentPosition = e.GetPosition(this);
-            _camTheta += (currentPosition.X - _lastMousePosition.X) * 0.005;
-            _camPhi += (currentPosition.Y - _lastMousePosition.Y) * 0.005;
-            if (_camPhi < 0.01) _camPhi = 0.01; if (_camPhi > Math.PI - 0.01) _camPhi = Math.PI - 0.01;
-            _lastMousePosition = currentPosition; UpdateCamera();
+            double deltaX = currentPosition.X - _lastMousePosition.X;
+            double deltaY = currentPosition.Y - _lastMousePosition.Y;
+
+            if (System.Windows.Input.Keyboard.IsKeyDown(System.Windows.Input.Key.LeftShift) ||
+    System.Windows.Input.Keyboard.IsKeyDown(System.Windows.Input.Key.RightShift))
+            {
+                Vector3D lookDir = cameraPreview.LookDirection;
+                lookDir.Normalize();
+                Vector3D upDir = new Vector3D(0, 0, 1);
+                Vector3D rightDir = Vector3D.CrossProduct(lookDir, upDir);
+                rightDir.Normalize();
+                Vector3D trueUp = Vector3D.CrossProduct(rightDir, lookDir);
+                trueUp.Normalize();
+
+                double panSpeed = 0.5 + (_camRadius * 0.0015);
+
+                _camTarget -= rightDir * (deltaX * panSpeed);
+                _camTarget += trueUp * (deltaY * panSpeed);
+            }
+            else
+            {
+                _camTheta += deltaX * 0.005;
+                _camPhi += deltaY * 0.005;
+
+                if (_camPhi < 0.01) _camPhi = 0.01;
+                if (_camPhi > Math.PI - 0.01) _camPhi = Math.PI - 0.01;
+            }
+
+            _lastMousePosition = currentPosition;
+            UpdateCamera();
         }
-        private void Viewport_MouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e) { _camRadius = Math.Max(50, _camRadius - e.Delta * 0.5); UpdateCamera(); }
+        private void Viewport_MouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            double zoomFactor = 1.1;
+            if (e.Delta > 0)
+                _camRadius /= zoomFactor;
+            else
+                _camRadius *= zoomFactor;
+
+            _camRadius = Math.Max(10, Math.Min(_camRadius, 200000));
+            UpdateCamera();
+        }
         private void UpdateCamera()
         {
             double x = _camTarget.X + _camRadius * Math.Sin(_camPhi) * Math.Cos(_camTheta);
