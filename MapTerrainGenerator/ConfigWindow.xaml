@@ -1,15 +1,24 @@
 ﻿<Window x:Class="MapTerrainGeneratorWPF.ConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Configuration" Height="315" Width="400" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        Title="Configuration" Height="383" Width="400" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="20">
         <StackPanel>
+            <Label Content="Game Data Path (e.g. etmain):" FontWeight="Bold"/>
+            <DockPanel Margin="0,0,0,15">
+                <Button Content="Browse" DockPanel.Dock="Right" Width="60" Margin="5,0,0,0" Click="BtnBrowseGamePath_Click"/>
+                <TextBox x:Name="txtGamePath" IsReadOnly="True" Padding="3"/>
+            </DockPanel>
             <Label Content="Default Output Folder:" FontWeight="Bold"/>
             <DockPanel Margin="0,0,0,15">
                 <Button Content="Browse" DockPanel.Dock="Right" Width="60" Margin="5,0,0,0" Click="BtnBrowseOutput_Click"/>
                 <TextBox x:Name="txtOutputFolder" IsReadOnly="True" Padding="3"/>
             </DockPanel>
-
+            <Label Content="Default Top Texture:" FontWeight="Bold"/>
+            <DockPanel Margin="0,0,0,15">
+                <Button Content="Browse..." DockPanel.Dock="Right" Width="65" Margin="5,0,0,0" Click="BtnBrowseDefTexture_Click"/>
+                <TextBox x:Name="txtDefTexture" Padding="3"/>
+            </DockPanel>
             <Label Content="Default Target Mode:" FontWeight="Bold"/>
             <ComboBox x:Name="cmbDefTarget" Margin="0,0,0,15" Padding="3">
                 <ComboBoxItem Content="Use .map Hint Brush"/>

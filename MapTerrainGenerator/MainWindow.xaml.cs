@@ -59,6 +59,18 @@ namespace MapTerrainGeneratorWPF
             }
         }
 
+        private void BtnBrowseTopTexture_Click(object sender, RoutedEventArgs e)
+        {
+            var browserWin = new TextureBrowserWindow(_appSettings);
+            browserWin.Owner = this;
+            if (browserWin.ShowDialog() == true)
+            {
+                txtTexture.Text = browserWin.SelectedTexturePath;
+                _appSettings = browserWin.Settings; 
+                _appSettings.Save();
+            }
+        }
+
         private void MenuExit_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
 
         private void MenuGithub_Click(object sender, RoutedEventArgs e)
@@ -156,6 +168,13 @@ namespace MapTerrainGeneratorWPF
                 if (cmbSubSquarePreset.SelectedItem is ComboBoxItem item && double.TryParse(item.Content.ToString(), out double presetVal)) { sizeX = presetVal; sizeY = presetVal; }
             }
             return true;
+        }
+
+        private void MenuTextureBrowser_Click(object sender, RoutedEventArgs e)
+        {
+            var browserWin = new TextureBrowserWindow(_appSettings);
+            browserWin.Owner = this;
+            browserWin.Show();
         }
 
         private void BtnGenerate_Click(object sender, RoutedEventArgs e)

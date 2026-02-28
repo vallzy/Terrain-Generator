@@ -9,7 +9,6 @@
             </MenuItem>
             <MenuItem Header="_View">
                 <MenuItem Header="Configuration" Click="MenuConfig_Click"/>
-                <MenuItem Header="Texture Browser" IsEnabled="False"/>
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="GitHub" Click="MenuGithub_Click"/>
@@ -91,10 +90,11 @@
                     </StackPanel>
                 </StackPanel>
 
-                <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="0,0,0,25">
-                    <Label Content="Top Texture:" Width="90" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtTexture" Text="common/caulk" Width="220" VerticalAlignment="Center" Padding="4" TextChanged="UI_Changed"/>
-                </StackPanel>
+                <Label Content="Top Texture:" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                <DockPanel Grid.Row="4" Grid.Column="1" Margin="0,5">
+                    <Button Content="Browse..." DockPanel.Dock="Right" Width="60" Margin="5,0,0,0" Click="BtnBrowseTopTexture_Click"/>
+                    <TextBox x:Name="txtTexture" Text="textures/common/caulk" Padding="3" TextChanged="UI_Changed"/>
+                </DockPanel>
 
                 <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,0,0,15">
                     <Label Content="Base Shape:" Width="90" VerticalAlignment="Center" FontWeight="Bold"/>

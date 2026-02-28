@@ -18,4 +18,8 @@
     </COMReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Pfim" Version="0.11.4" />
+  </ItemGroup>
+
 </Project>
