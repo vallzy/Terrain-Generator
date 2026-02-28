@@ -94,7 +94,7 @@
                 <Label Content="Top Texture:" Grid.Row="4" Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 <DockPanel Grid.Row="4" Grid.Column="1" Margin="0,5">
                     <Button Content="Browse..." DockPanel.Dock="Right" Width="60" Margin="5,0,0,0" Click="BtnBrowseTopTexture_Click"/>
-                    <TextBox x:Name="txtTexture" Text="textures/common/caulk" Padding="3" TextChanged="UI_Changed"/>
+                    <TextBox x:Name="txtTexture" Text="common/caulk" Padding="3" TextChanged="UI_Changed"/>
                 </DockPanel>
 
                 <StackPanel Grid.Row="5" Orientation="Horizontal" Margin="0,0,0,15">

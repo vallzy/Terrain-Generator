@@ -43,6 +43,7 @@ namespace MapTerrainGeneratorWPF
         {
             cmbTargetMode.SelectedIndex = _appSettings.DefaultTargetMode;
             cmbNoiseType.SelectedIndex = _appSettings.DefaultNoiseType;
+            txtTexture.Text = _appSettings.DefaultTexture;
             UpdateDynamicVisibility();
             UpdateDefaultMapName();
         }

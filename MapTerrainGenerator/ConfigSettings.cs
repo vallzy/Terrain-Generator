@@ -10,7 +10,7 @@ namespace MapTerrainGeneratorWPF
         public string GameDataPath { get; set; } = ""; 
         public int DefaultTargetMode { get; set; } = 0;
         public int DefaultNoiseType { get; set; } = 0;
-        public string DefaultTexture { get; set; } = "textures/common/caulk"; 
+        public string DefaultTexture { get; set; } = "common/caulk"; 
         public List<string> FavoriteTextures { get; set; } = new List<string>();
 
         private static readonly string ConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
