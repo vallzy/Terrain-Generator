@@ -61,6 +61,8 @@ namespace MapTerrainGeneratorWPF
 
         private void BtnBrowseTopTexture_Click(object sender, RoutedEventArgs e)
         {
+            if (!EnsureGameDataPath()) return;
+
             var browserWin = new TextureBrowserWindow(_appSettings);
             browserWin.Owner = this;
             if (browserWin.ShowDialog() == true)
@@ -149,6 +151,26 @@ namespace MapTerrainGeneratorWPF
             InvalidateExport();
         }
 
+        private bool EnsureGameDataPath()
+        {
+            if (string.IsNullOrWhiteSpace(_appSettings.GameDataPath))
+            {
+                var result = MessageBox.Show(
+                    "The Game Data Path has not been set. Would you like to open Configuration to set it now?",
+                    "Missing Game Path",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    MenuConfig_Click(null, null);
+                    return !string.IsNullOrWhiteSpace(_appSettings.GameDataPath);
+                }
+                return false; 
+            }
+            return true; 
+        }
+
         private void ChkAdvancedSubSquare_Changed(object sender, RoutedEventArgs e)
         {
             bool isAdvanced = chkAdvancedSubSquare.IsChecked == true;
@@ -176,6 +198,7 @@ namespace MapTerrainGeneratorWPF
 
         private void MenuTextureBrowser_Click(object sender, RoutedEventArgs e)
         {
+            if (!EnsureGameDataPath()) return;
             var browserWin = new TextureBrowserWindow(_appSettings);
             browserWin.Owner = this;
             browserWin.Show();

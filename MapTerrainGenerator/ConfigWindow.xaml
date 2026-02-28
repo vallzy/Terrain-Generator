@@ -1,7 +1,7 @@
 ﻿<Window x:Class="MapTerrainGeneratorWPF.ConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Configuration" Height="383" Width="400" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        Title="Configuration" Height="440" Width="400" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Grid Margin="20">
         <StackPanel>
             <Label Content="Game Data Path (e.g. etmain):" FontWeight="Bold"/>
