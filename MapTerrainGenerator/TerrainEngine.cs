@@ -13,7 +13,7 @@ namespace MapTerrainGeneratorWPF
             string mode, string filePath, double manWidth, double manLength, double manHeight,
             double stepX, double stepY, string topTexture, int shapeType, double shapeHeight,
             double terraceStep, int noiseType, double variance, double frequency,
-            string outputName, bool overrideMap, Action<string> log)
+            string outputName, bool overrideMap, Action<string> log, double tunnelHeight = 0)
         {
             try
             {
@@ -35,10 +35,20 @@ namespace MapTerrainGeneratorWPF
                 AdjustBoundsToFitGrid(target, stepX, stepY, log);
                 log($"Final Terrain Grid: {target.WidthX}x{target.LengthY} | Step Size: X:{stepX} Y:{stepY}");
 
-                bool splitDiagonally = variance > 0 || shapeType > 0;
-
-                var heightMap = GenerateHeightMap(target, stepX, stepY, shapeType, shapeHeight, variance, frequency, noiseType, terraceStep);
-                string newFuncGroup = GenerateFuncGroup(target, stepX, stepY, splitDiagonally, topTexture, heightMap);
+                string newFuncGroup;
+                if (shapeType == 7 || shapeType == 8) // Tunnel / Slope Tunnel
+                {
+                    double caveHeight = shapeType == 7 ? shapeHeight : (tunnelHeight > 0 ? tunnelHeight : shapeHeight);
+                    double slopeHeight = shapeType == 8 ? shapeHeight : 0;
+                    var (floorMap, ceilingMap, leftWallMap, rightWallMap, stepZ) = GenerateTunnelHeightMaps(target, stepX, stepY, caveHeight, slopeHeight, variance, frequency, noiseType, terraceStep);
+                    newFuncGroup = GenerateTunnelFuncGroups(target, stepX, stepY, stepZ, topTexture, floorMap, ceilingMap, leftWallMap, rightWallMap, caveHeight, slopeHeight);
+                }
+                else
+                {
+                    bool splitDiagonally = variance > 0 || shapeType > 0;
+                    var heightMap = GenerateHeightMap(target, stepX, stepY, shapeType, shapeHeight, variance, frequency, noiseType, terraceStep);
+                    newFuncGroup = GenerateFuncGroup(target, stepX, stepY, splitDiagonally, topTexture, heightMap);
+                }
 
                 return ExportFile(mode, originalLines, target, newFuncGroup, filePath, outputName, overrideMap, "", log);
             }
@@ -143,6 +153,278 @@ namespace MapTerrainGeneratorWPF
                 }
             }
             return heightMap;
+        }
+
+        public static (Dictionary<(double x, double y), double> floorMap,
+            Dictionary<(double x, double y), double> ceilingMap,
+            Dictionary<(double y, double z), double> leftWallMap,
+            Dictionary<(double y, double z), double> rightWallMap,
+            double stepZ)
+            GenerateTunnelHeightMaps(BrushData target, double stepX, double stepY, double caveHeight, double slopeHeight, double variance, double frequency, int noiseType, double terraceStep)
+        {
+            var floorMap = new Dictionary<(double x, double y), double>();
+            var ceilingMap = new Dictionary<(double x, double y), double>();
+            var leftWallMap = new Dictionary<(double y, double z), double>();
+            var rightWallMap = new Dictionary<(double y, double z), double>();
+            Random rnd = new Random();
+            double seedFloorX = rnd.NextDouble() * 10000, seedFloorY = rnd.NextDouble() * 10000;
+            double seedCeilX = rnd.NextDouble() * 10000, seedCeilY = rnd.NextDouble() * 10000;
+            double seedWallL = rnd.NextDouble() * 10000;
+            double seedWallR = rnd.NextDouble() * 10000;
+
+            double centerX = (target.MinX + target.MaxX) / 2.0;
+            double halfWidth = target.WidthX / 2.0;
+
+            // Generate floor and ceiling heightmaps
+            for (double x = target.MinX; x <= target.MaxX + 0.01; x += stepX)
+            {
+                for (double y = target.MinY; y <= target.MaxY + 0.01; y += stepY)
+                {
+                    // Circular blend: 0 at center, 1 at edge
+                    double t = halfWidth > 0 ? Math.Min(1.0, Math.Abs(x - centerX) / halfWidth) : 0;
+                    double blend = 1.0 - Math.Sqrt(Math.Max(0, 1.0 - t * t));
+
+                    double floorNoise = 0, ceilNoise = 0;
+                    if (variance > 0)
+                    {
+                        if (noiseType == 0)
+                        {
+                            floorNoise = Math.Abs(Perlin.Noise((x + seedFloorX) * frequency, (y + seedFloorY) * frequency)) * variance;
+                            ceilNoise = Math.Abs(Perlin.Noise((x + seedCeilX) * frequency, (y + seedCeilY) * frequency)) * variance;
+                        }
+                        else if (noiseType == 1)
+                        {
+                            floorNoise = Math.Abs(Simplex.Noise((x + seedFloorX) * frequency, (y + seedFloorY) * frequency)) * variance;
+                            ceilNoise = Math.Abs(Simplex.Noise((x + seedCeilX) * frequency, (y + seedCeilY) * frequency)) * variance;
+                        }
+                        else if (noiseType == 2)
+                        {
+                            floorNoise = rnd.NextDouble() * variance;
+                            ceilNoise = rnd.NextDouble() * variance;
+                        }
+                    }
+
+                    double ny = target.LengthY > 0 ? (y - target.MinY) / target.LengthY : 0;
+                    double baseZ = target.MaxZ + slopeHeight * ny;
+                    double floorZ = baseZ + blend * (caveHeight * 0.25) + floorNoise;
+                    double ceilZ = baseZ + caveHeight - blend * (caveHeight * 0.25) - ceilNoise;
+
+                    if (floorZ > ceilZ) { double mid = (floorZ + ceilZ) / 2.0; floorZ = mid; ceilZ = mid; }
+
+                    if (terraceStep > 0)
+                    {
+                        floorZ = Math.Floor(floorZ / terraceStep) * terraceStep;
+                        ceilZ = Math.Ceiling(ceilZ / terraceStep) * terraceStep;
+                    }
+
+                    floorMap[(Math.Round(x, 2), Math.Round(y, 2))] = floorZ;
+                    ceilingMap[(Math.Round(x, 2), Math.Round(y, 2))] = ceilZ;
+                }
+            }
+
+            // Wall step in Z: close to stepX but evenly divides the full height range
+            double totalWallHeight = caveHeight + slopeHeight;
+            int numZSteps = Math.Max(1, (int)Math.Round(totalWallHeight / stepX));
+            double stepZ = totalWallHeight / numZSteps;
+            double wallMinZ = target.MaxZ;
+            double wallMaxZ = target.MaxZ + totalWallHeight;
+
+            // Generate 2D wall heightmaps over (Y, Z) grid — same pattern as floor, just rotated
+            for (double y = target.MinY; y <= target.MaxY + 0.01; y += stepY)
+            {
+                for (double z = wallMinZ; z <= wallMaxZ + 0.01; z += stepZ)
+                {
+                    double ry = Math.Round(y, 2), rz = Math.Round(z, 2);
+
+                    double wallNoise = 0;
+                    if (variance > 0)
+                    {
+                        if (noiseType == 0) wallNoise = Math.Abs(Perlin.Noise((y + seedWallL) * frequency, (z + seedWallL) * frequency)) * variance;
+                        else if (noiseType == 1) wallNoise = Math.Abs(Simplex.Noise((y + seedWallL) * frequency, (z + seedWallL) * frequency)) * variance;
+                        else if (noiseType == 2) wallNoise = rnd.NextDouble() * variance;
+                    }
+                    leftWallMap[(ry, rz)] = target.MinX + wallNoise;
+
+                    wallNoise = 0;
+                    if (variance > 0)
+                    {
+                        if (noiseType == 0) wallNoise = Math.Abs(Perlin.Noise((y + seedWallR) * frequency, (z + seedWallR) * frequency)) * variance;
+                        else if (noiseType == 1) wallNoise = Math.Abs(Simplex.Noise((y + seedWallR) * frequency, (z + seedWallR) * frequency)) * variance;
+                        else if (noiseType == 2) wallNoise = rnd.NextDouble() * variance;
+                    }
+                    rightWallMap[(ry, rz)] = target.MaxX - wallNoise;
+                }
+            }
+
+            return (floorMap, ceilingMap, leftWallMap, rightWallMap, stepZ);
+        }
+
+        public static string GenerateTunnelFuncGroups(BrushData originalBrush, double stepX, double stepY, double stepZ, string topTexture,
+            Dictionary<(double, double), double> floorMap, Dictionary<(double, double), double> ceilingMap,
+            Dictionary<(double y, double z), double> leftWallMap, Dictionary<(double y, double z), double> rightWallMap, double caveHeight, double slopeHeight = 0)
+        {
+            StringBuilder sbFloor = new StringBuilder();
+            StringBuilder sbCeiling = new StringBuilder();
+            StringBuilder sbLeftWall = new StringBuilder();
+            StringBuilder sbRightWall = new StringBuilder();
+
+            sbFloor.AppendLine("// entity"); sbFloor.AppendLine("{"); sbFloor.AppendLine("\"classname\" \"func_group\"");
+            sbCeiling.AppendLine("// entity"); sbCeiling.AppendLine("{"); sbCeiling.AppendLine("\"classname\" \"func_group\"");
+            sbLeftWall.AppendLine("// entity"); sbLeftWall.AppendLine("{"); sbLeftWall.AppendLine("\"classname\" \"func_group\"");
+            sbRightWall.AppendLine("// entity"); sbRightWall.AppendLine("{"); sbRightWall.AppendLine("\"classname\" \"func_group\"");
+
+            int fBrush = 0, cBrush = 0, lwBrush = 0, rwBrush = 0;
+            double minZ = originalBrush.MinZ;
+            double maxCeilZ = originalBrush.MaxZ + caveHeight + slopeHeight;
+            string caulkTex = "common/caulk 0 0 0";
+            string topTex = $"{topTexture} 0 0 0";
+            string matrix = "( ( 0.03125 0 0 ) ( 0 0.03125 0 ) )";
+
+            // Floor and ceiling brushes
+            for (double x = originalBrush.MinX; x < originalBrush.MaxX - 0.01; x += stepX)
+            {
+                for (double y = originalBrush.MinY; y < originalBrush.MaxY - 0.01; y += stepY)
+                {
+                    double currentMaxX = Math.Min(x + stepX, originalBrush.MaxX);
+                    double currentMaxY = Math.Min(y + stepY, originalBrush.MaxY);
+
+                    double fBL = floorMap[(Math.Round(x, 2), Math.Round(y, 2))];
+                    double fTL = floorMap[(Math.Round(x, 2), Math.Round(currentMaxY, 2))];
+                    double fBR = floorMap[(Math.Round(currentMaxX, 2), Math.Round(y, 2))];
+                    double fTR = floorMap[(Math.Round(currentMaxX, 2), Math.Round(currentMaxY, 2))];
+
+                    double cBL = ceilingMap[(Math.Round(x, 2), Math.Round(y, 2))];
+                    double cTL = ceilingMap[(Math.Round(x, 2), Math.Round(currentMaxY, 2))];
+                    double cBR = ceilingMap[(Math.Round(currentMaxX, 2), Math.Round(y, 2))];
+                    double cTR = ceilingMap[(Math.Round(currentMaxX, 2), Math.Round(currentMaxY, 2))];
+
+                    // Floor triangle 1
+                    sbFloor.AppendLine($"// brush {fBrush++}\n{{\nbrushDef\n{{");
+                    sbFloor.AppendLine($"( {x} {y} {fBL} ) ( {x} {currentMaxY} {fTL} ) ( {currentMaxX} {y} {fBR} ) {matrix} {topTex}");
+                    sbFloor.AppendLine($"( {x} {y} {minZ} ) ( {currentMaxX} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine($"( {x} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {x} {y} {maxCeilZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine($"( {x} {y} {minZ} ) ( {x} {y} {maxCeilZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine("}\n}");
+
+                    // Floor triangle 2
+                    sbFloor.AppendLine($"// brush {fBrush++}\n{{\nbrushDef\n{{");
+                    sbFloor.AppendLine($"( {currentMaxX} {currentMaxY} {fTR} ) ( {currentMaxX} {y} {fBR} ) ( {x} {currentMaxY} {fTL} ) {matrix} {topTex}");
+                    sbFloor.AppendLine($"( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {maxCeilZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbFloor.AppendLine("}\n}");
+
+                    // Ceiling triangle 1 (reversed floor: solid above, textured face visible from below)
+                    sbCeiling.AppendLine($"// brush {cBrush++}\n{{\nbrushDef\n{{");
+                    sbCeiling.AppendLine($"( {x} {y} {cBL} ) ( {currentMaxX} {y} {cBR} ) ( {x} {currentMaxY} {cTL} ) {matrix} {topTex}");
+                    sbCeiling.AppendLine($"( {x} {y} {maxCeilZ} ) ( {x} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {maxCeilZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {x} {y} {maxCeilZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {y} {minZ} ) ( {x} {y} {maxCeilZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine("}\n}");
+
+                    // Ceiling triangle 2 (reversed floor)
+                    sbCeiling.AppendLine($"// brush {cBrush++}\n{{\nbrushDef\n{{");
+                    sbCeiling.AppendLine($"( {currentMaxX} {currentMaxY} {cTR} ) ( {x} {currentMaxY} {cTL} ) ( {currentMaxX} {y} {cBR} ) {matrix} {topTex}");
+                    sbCeiling.AppendLine($"( {currentMaxX} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {x} {currentMaxY} {maxCeilZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {maxCeilZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine("}\n}");
+                }
+            }
+
+            // Left wall — same split-diagonal pattern as floor, rotated:
+            //   grid axes: Y (first) and Z (second), displacement axis: X (inward from MinX)
+            //   flat outer face at wallOuterLeft, sloped inner surface from leftWallMap
+            double wallOuterLeft = originalBrush.MinX - stepX;
+            double wallMinZ = originalBrush.MaxZ;
+            double wallMaxZ = originalBrush.MaxZ + caveHeight + slopeHeight;
+            double xLimitL = (originalBrush.MinX + originalBrush.MaxX) / 2.0; // mid-tunnel, for side plane extents
+
+            for (double gy = originalBrush.MinY; gy < originalBrush.MaxY - 0.01; gy += stepY)
+            {
+                for (double gz = wallMinZ; gz < wallMaxZ - 0.01; gz += stepZ)
+                {
+                    double gmaxY = Math.Min(gy + stepY, originalBrush.MaxY);
+                    double gmaxZ = Math.Min(gz + stepZ, wallMaxZ);
+                    double rgy = Math.Round(gy, 2), rgmaxY = Math.Round(gmaxY, 2);
+                    double rgz = Math.Round(gz, 2), rgmaxZ = Math.Round(gmaxZ, 2);
+
+                    double xBL = leftWallMap[(rgy, rgz)];
+                    double xTL = leftWallMap[(rgy, rgmaxZ)];
+                    double xBR = leftWallMap[(rgmaxY, rgz)];
+                    double xTR = leftWallMap[(rgmaxY, rgmaxZ)];
+
+                    // Triangle 1: (BL, TL, BR) — inner normal -X
+                    sbLeftWall.AppendLine($"// brush {lwBrush++}\n{{\nbrushDef\n{{");
+                    sbLeftWall.AppendLine($"( {xBL} {gy} {gz} ) ( {xTL} {gy} {gmaxZ} ) ( {xBR} {gmaxY} {gz} ) {matrix} {topTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gy} {gz} ) ( {wallOuterLeft} {gmaxY} {gz} ) ( {wallOuterLeft} {gy} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gy} {gz} ) ( {wallOuterLeft} {gy} {gmaxZ} ) ( {xLimitL} {gy} {gz} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gy} {gz} ) ( {xLimitL} {gy} {gz} ) ( {wallOuterLeft} {gmaxY} {gz} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gmaxY} {gz} ) ( {xLimitL} {gmaxY} {gz} ) ( {wallOuterLeft} {gy} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine("}\n}");
+
+                    // Triangle 2: (TR, BR, TL) — inner normal -X
+                    sbLeftWall.AppendLine($"// brush {lwBrush++}\n{{\nbrushDef\n{{");
+                    sbLeftWall.AppendLine($"( {xTR} {gmaxY} {gmaxZ} ) ( {xBR} {gmaxY} {gz} ) ( {xTL} {gy} {gmaxZ} ) {matrix} {topTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gmaxY} {gmaxZ} ) ( {wallOuterLeft} {gy} {gmaxZ} ) ( {wallOuterLeft} {gmaxY} {gz} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gmaxY} {gz} ) ( {xLimitL} {gmaxY} {gz} ) ( {wallOuterLeft} {gmaxY} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gy} {gmaxZ} ) ( {wallOuterLeft} {gmaxY} {gmaxZ} ) ( {xLimitL} {gy} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine($"( {wallOuterLeft} {gy} {gmaxZ} ) ( {xLimitL} {gy} {gmaxZ} ) ( {wallOuterLeft} {gmaxY} {gz} ) {matrix} {caulkTex}");
+                    sbLeftWall.AppendLine("}\n}");
+                }
+            }
+
+            // Right wall — same pattern, mirrored: displacement -X from MaxX, flat outer face at wallOuterRight
+            double wallOuterRight = originalBrush.MaxX + stepX;
+            double xLimitR = (originalBrush.MinX + originalBrush.MaxX) / 2.0;
+
+            for (double gy = originalBrush.MinY; gy < originalBrush.MaxY - 0.01; gy += stepY)
+            {
+                for (double gz = wallMinZ; gz < wallMaxZ - 0.01; gz += stepZ)
+                {
+                    double gmaxY = Math.Min(gy + stepY, originalBrush.MaxY);
+                    double gmaxZ = Math.Min(gz + stepZ, wallMaxZ);
+                    double rgy = Math.Round(gy, 2), rgmaxY = Math.Round(gmaxY, 2);
+                    double rgz = Math.Round(gz, 2), rgmaxZ = Math.Round(gmaxZ, 2);
+
+                    double xBL = rightWallMap[(rgy, rgz)];
+                    double xTL = rightWallMap[(rgy, rgmaxZ)];
+                    double xBR = rightWallMap[(rgmaxY, rgz)];
+                    double xTR = rightWallMap[(rgmaxY, rgmaxZ)];
+
+                    // Triangle 1: inner normal +X (surface faces into tunnel from the right)
+                    sbRightWall.AppendLine($"// brush {rwBrush++}\n{{\nbrushDef\n{{");
+                    sbRightWall.AppendLine($"( {xBL} {gy} {gz} ) ( {xBR} {gmaxY} {gz} ) ( {xTL} {gy} {gmaxZ} ) {matrix} {topTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gy} {gz} ) ( {wallOuterRight} {gy} {gmaxZ} ) ( {wallOuterRight} {gmaxY} {gz} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gy} {gz} ) ( {xLimitR} {gy} {gz} ) ( {wallOuterRight} {gy} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gy} {gz} ) ( {wallOuterRight} {gmaxY} {gz} ) ( {xLimitR} {gy} {gz} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gmaxY} {gz} ) ( {wallOuterRight} {gy} {gmaxZ} ) ( {xLimitR} {gmaxY} {gz} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine("}\n}");
+
+                    // Triangle 2: inner normal +X
+                    sbRightWall.AppendLine($"// brush {rwBrush++}\n{{\nbrushDef\n{{");
+                    sbRightWall.AppendLine($"( {xTR} {gmaxY} {gmaxZ} ) ( {xTL} {gy} {gmaxZ} ) ( {xBR} {gmaxY} {gz} ) {matrix} {topTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gmaxY} {gmaxZ} ) ( {wallOuterRight} {gmaxY} {gz} ) ( {wallOuterRight} {gy} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gmaxY} {gz} ) ( {wallOuterRight} {gmaxY} {gmaxZ} ) ( {xLimitR} {gmaxY} {gz} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gy} {gmaxZ} ) ( {xLimitR} {gy} {gmaxZ} ) ( {wallOuterRight} {gmaxY} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine($"( {wallOuterRight} {gy} {gmaxZ} ) ( {wallOuterRight} {gmaxY} {gz} ) ( {xLimitR} {gy} {gmaxZ} ) {matrix} {caulkTex}");
+                    sbRightWall.AppendLine("}\n}");
+                }
+            }
+
+            sbFloor.AppendLine("}");
+            sbCeiling.AppendLine("}");
+            sbLeftWall.AppendLine("}");
+            sbRightWall.AppendLine("}");
+
+            return sbFloor.ToString().TrimEnd() + "\n" +
+                   sbCeiling.ToString().TrimEnd() + "\n" +
+                   sbLeftWall.ToString().TrimEnd() + "\n" +
+                   sbRightWall.ToString().TrimEnd();
         }
 
         public static string GenerateFuncGroup(BrushData originalBrush, double stepX, double stepY, bool splitDiagonally, string topTexture, Dictionary<(double, double), double> heightMap)

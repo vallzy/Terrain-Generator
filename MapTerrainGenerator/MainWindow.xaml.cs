@@ -137,10 +137,14 @@ namespace MapTerrainGeneratorWPF
                         case 4: lblShapeHeight.Content = "Slope Height:"; break;
                         case 5: lblShapeHeight.Content = "Volcano Height:"; break;
                         case 6: lblShapeHeight.Content = "Valley Depth:"; break;
+                        case 7: lblShapeHeight.Content = "Tunnel Height:"; break;
+                        case 8: lblShapeHeight.Content = "Slope Height:"; break;
                         default: lblShapeHeight.Content = "Shape Height:"; break;
                     }
                 }
             }
+            if (panelTunnelHeight != null)
+                panelTunnelHeight.Visibility = cmbShapeType.SelectedIndex == 8 ? Visibility.Visible : Visibility.Collapsed;
             if (panelTerrace != null) panelTerrace.Visibility = cmbShapeType.SelectedIndex > 0 ? Visibility.Visible : Visibility.Collapsed;
             InvalidateExport();
         }
@@ -180,35 +184,60 @@ namespace MapTerrainGeneratorWPF
         private void BtnGenerate_Click(object sender, RoutedEventArgs e)
         {
             txtLog.Clear(); btnExport.IsEnabled = false;
+            _lastGeneratedFuncGroup = null; _lastTargetBrush = null; _lastOriginalLines = null;
 
             string mode = cmbTargetMode.SelectedIndex == 0 ? "hint" : "manual";
-            string[] originalLines = mode == "hint" && File.Exists(txtFile.Text) ? File.ReadAllLines(txtFile.Text) : new string[0];
-
-            if (mode == "hint" && originalLines.Length == 0) { Log("Error: Select a valid .map file."); return; }
+            string[] originalLines = new string[0];
+            if (mode == "hint")
+            {
+                if (!File.Exists(txtFile.Text)) { Log("Error: Select a valid .map file."); return; }
+                originalLines = File.ReadAllLines(txtFile.Text);
+            }
 
             if (!double.TryParse(txtGenWidth.Text, out double w) || !double.TryParse(txtGenLength.Text, out double l) || !double.TryParse(txtGenHeight.Text, out double h)) return;
+            if (!TryGetSubSquareSizes(out double stepX, out double stepY)) return;
 
-            double stepX = 64, stepY = 64;
-            if (chkAdvancedSubSquare.IsChecked == true) { double.TryParse(txtSizeX.Text, out stepX); double.TryParse(txtSizeY.Text, out stepY); }
-            else { if (cmbSubSquarePreset.SelectedItem is ComboBoxItem item) double.TryParse(item.Content.ToString(), out stepX); stepY = stepX; }
+            string rawFrequency = cmbFrequency.Text.Split(' ')[0];
+            double shapeHeight = 0;
+            if (cmbShapeType.SelectedIndex > 0 && !double.TryParse(txtShapeHeight.Text, out shapeHeight)) { Log("Error: Invalid Shape Height."); return; }
+            if (!double.TryParse(txtTerrace.Text, out double terraceStep) || !double.TryParse(txtVariance.Text, out double variance) || !double.TryParse(rawFrequency, out double frequency)) return;
 
-            double shapeHeight = 0; double.TryParse(txtShapeHeight.Text, out shapeHeight);
-            double terrace = 0; double.TryParse(txtTerrace.Text, out terrace);
-            double variance = 0; double.TryParse(txtVariance.Text, out variance);
-            double frequency = 0.005; double.TryParse(cmbFrequency.Text.Split(' ')[0], out frequency);
+            string topTexture = string.IsNullOrWhiteSpace(txtTexture.Text) ? "common/caulk" : txtTexture.Text;
+            int shapeType = cmbShapeType.SelectedIndex;
+            int noiseType = cmbNoiseType.SelectedIndex;
 
             var target = TerrainEngine.GetTargetBrushData(mode, originalLines, w, l, h, Log);
             if (target == null) return;
 
             TerrainEngine.AdjustBoundsToFitGrid(target, stepX, stepY, Log);
-            var heightMap = TerrainEngine.GenerateHeightMap(target, stepX, stepY, cmbShapeType.SelectedIndex, shapeHeight, variance, frequency, cmbNoiseType.SelectedIndex, terrace);
+            Log($"Final Terrain Grid: {target.WidthX}x{target.LengthY} | Step Size: X:{stepX} Y:{stepY}");
 
-            _lastGeneratedFuncGroup = TerrainEngine.GenerateFuncGroup(target, stepX, stepY, (variance > 0 || cmbShapeType.SelectedIndex > 0), txtTexture.Text, heightMap);
-            _lastTargetBrush = target;
-            _lastOriginalLines = originalLines;
+            if (shapeType == 7 || shapeType == 8) // Tunnel / Slope Tunnel
+            {
+                double caveHeight = shapeHeight;
+                double slopeHeight = 0;
+                if (shapeType == 8)
+                {
+                    if (!double.TryParse(txtTunnelHeight.Text, out caveHeight)) { Log("Error: Invalid Tunnel Height."); return; }
+                    slopeHeight = shapeHeight;
+                }
+                var (floorMap, ceilingMap, leftWallMap, rightWallMap, stepZ) = TerrainEngine.GenerateTunnelHeightMaps(target, stepX, stepY, caveHeight, slopeHeight, variance, frequency, noiseType, terraceStep);
+                _lastGeneratedFuncGroup = TerrainEngine.GenerateTunnelFuncGroups(target, stepX, stepY, stepZ, topTexture, floorMap, ceilingMap, leftWallMap, rightWallMap, caveHeight, slopeHeight);
+                _lastTargetBrush = target;
+                _lastOriginalLines = originalLines;
+                Build3DCaveMesh(target, stepX, stepY, stepZ, floorMap, ceilingMap, leftWallMap, rightWallMap, caveHeight, slopeHeight);
+            }
+            else
+            {
+                bool splitDiagonally = variance > 0 || shapeType > 0;
+                var heightMap = TerrainEngine.GenerateHeightMap(target, stepX, stepY, shapeType, shapeHeight, variance, frequency, noiseType, terraceStep);
+                _lastGeneratedFuncGroup = TerrainEngine.GenerateFuncGroup(target, stepX, stepY, splitDiagonally, topTexture, heightMap);
+                _lastTargetBrush = target;
+                _lastOriginalLines = originalLines;
+                Build3DMesh(target, stepX, stepY, heightMap, shapeHeight);
+            }
 
-            Build3DMesh(target, stepX, stepY, heightMap, shapeHeight);
-            Log("Terrain generated successfully.");
+            Log("Terrain generated successfully. Ready to export.");
             btnExport.IsEnabled = true;
         }
 
@@ -244,6 +273,109 @@ namespace MapTerrainGeneratorWPF
             modelGroup.Children.Add(_previewModel);
 
             _camTarget = new Point3D(target.MinX + (target.WidthX / 2), target.MinY + (target.LengthY / 2), target.MaxZ + (shapeHeight / 2));
+            _camRadius = Math.Max(target.WidthX, target.LengthY) * 1.5;
+            UpdateCamera();
+        }
+
+        private void Build3DCaveMesh(BrushData target, double stepX, double stepY, double stepZ,
+            System.Collections.Generic.Dictionary<(double, double), double> floorMap,
+            System.Collections.Generic.Dictionary<(double, double), double> ceilingMap,
+            System.Collections.Generic.Dictionary<(double y, double z), double> leftWallMap,
+            System.Collections.Generic.Dictionary<(double y, double z), double> rightWallMap,
+            double caveHeight, double slopeHeight = 0)
+        {
+            MeshGeometry3D floorMesh = new MeshGeometry3D();
+            MeshGeometry3D ceilMesh = new MeshGeometry3D();
+            MeshGeometry3D leftMesh = new MeshGeometry3D();
+            MeshGeometry3D rightMesh = new MeshGeometry3D();
+            int fIdx = 0, cIdx = 0, lIdx = 0, rIdx = 0;
+
+            for (double x = target.MinX; x < target.MaxX - 0.01; x += stepX)
+            {
+                for (double y = target.MinY; y < target.MaxY - 0.01; y += stepY)
+                {
+                    double currentMaxX = Math.Min(x + stepX, target.MaxX);
+                    double currentMaxY = Math.Min(y + stepY, target.MaxY);
+
+                    double fBL = floorMap[(Math.Round(x, 2), Math.Round(y, 2))];
+                    double fTL = floorMap[(Math.Round(x, 2), Math.Round(currentMaxY, 2))];
+                    double fBR = floorMap[(Math.Round(currentMaxX, 2), Math.Round(y, 2))];
+                    double fTR = floorMap[(Math.Round(currentMaxX, 2), Math.Round(currentMaxY, 2))];
+
+                    floorMesh.Positions.Add(new Point3D(x, y, fBL));
+                    floorMesh.Positions.Add(new Point3D(x, currentMaxY, fTL));
+                    floorMesh.Positions.Add(new Point3D(currentMaxX, y, fBR));
+                    floorMesh.Positions.Add(new Point3D(currentMaxX, currentMaxY, fTR));
+                    floorMesh.TriangleIndices.Add(fIdx + 0); floorMesh.TriangleIndices.Add(fIdx + 2); floorMesh.TriangleIndices.Add(fIdx + 1);
+                    floorMesh.TriangleIndices.Add(fIdx + 3); floorMesh.TriangleIndices.Add(fIdx + 1); floorMesh.TriangleIndices.Add(fIdx + 2);
+                    fIdx += 4;
+
+                    double cBL = ceilingMap[(Math.Round(x, 2), Math.Round(y, 2))];
+                    double cTL = ceilingMap[(Math.Round(x, 2), Math.Round(currentMaxY, 2))];
+                    double cBR = ceilingMap[(Math.Round(currentMaxX, 2), Math.Round(y, 2))];
+                    double cTR = ceilingMap[(Math.Round(currentMaxX, 2), Math.Round(currentMaxY, 2))];
+
+                    ceilMesh.Positions.Add(new Point3D(x, y, cBL));
+                    ceilMesh.Positions.Add(new Point3D(x, currentMaxY, cTL));
+                    ceilMesh.Positions.Add(new Point3D(currentMaxX, y, cBR));
+                    ceilMesh.Positions.Add(new Point3D(currentMaxX, currentMaxY, cTR));
+                    ceilMesh.TriangleIndices.Add(cIdx + 0); ceilMesh.TriangleIndices.Add(cIdx + 1); ceilMesh.TriangleIndices.Add(cIdx + 2);
+                    ceilMesh.TriangleIndices.Add(cIdx + 3); ceilMesh.TriangleIndices.Add(cIdx + 2); ceilMesh.TriangleIndices.Add(cIdx + 1);
+                    cIdx += 4;
+                }
+            }
+
+            double wallMinZ = target.MaxZ;
+            double wallMaxZ = target.MaxZ + caveHeight + slopeHeight;
+            for (double gy = target.MinY; gy < target.MaxY - 0.01; gy += stepY)
+            {
+                for (double gz = wallMinZ; gz < wallMaxZ - 0.01; gz += stepZ)
+                {
+                    double gmaxY = Math.Min(gy + stepY, target.MaxY);
+                    double gmaxZ = Math.Min(gz + stepZ, wallMaxZ);
+                    double rgy = Math.Round(gy, 2), rgmaxY = Math.Round(gmaxY, 2);
+                    double rgz = Math.Round(gz, 2), rgmaxZ = Math.Round(gmaxZ, 2);
+
+                    double lBL = leftWallMap[(rgy, rgz)];
+                    double lTL = leftWallMap[(rgy, rgmaxZ)];
+                    double lBR = leftWallMap[(rgmaxY, rgz)];
+                    double lTR = leftWallMap[(rgmaxY, rgmaxZ)];
+
+                    leftMesh.Positions.Add(new Point3D(lBL, gy, gz));
+                    leftMesh.Positions.Add(new Point3D(lTL, gy, gmaxZ));
+                    leftMesh.Positions.Add(new Point3D(lBR, gmaxY, gz));
+                    leftMesh.Positions.Add(new Point3D(lTR, gmaxY, gmaxZ));
+                    leftMesh.TriangleIndices.Add(lIdx + 0); leftMesh.TriangleIndices.Add(lIdx + 1); leftMesh.TriangleIndices.Add(lIdx + 2);
+                    leftMesh.TriangleIndices.Add(lIdx + 3); leftMesh.TriangleIndices.Add(lIdx + 2); leftMesh.TriangleIndices.Add(lIdx + 1);
+                    lIdx += 4;
+
+                    double rBL = rightWallMap[(rgy, rgz)];
+                    double rTL = rightWallMap[(rgy, rgmaxZ)];
+                    double rBR = rightWallMap[(rgmaxY, rgz)];
+                    double rTR = rightWallMap[(rgmaxY, rgmaxZ)];
+
+                    rightMesh.Positions.Add(new Point3D(rBL, gy, gz));
+                    rightMesh.Positions.Add(new Point3D(rTL, gy, gmaxZ));
+                    rightMesh.Positions.Add(new Point3D(rBR, gmaxY, gz));
+                    rightMesh.Positions.Add(new Point3D(rTR, gmaxY, gmaxZ));
+                    rightMesh.TriangleIndices.Add(rIdx + 0); rightMesh.TriangleIndices.Add(rIdx + 2); rightMesh.TriangleIndices.Add(rIdx + 1);
+                    rightMesh.TriangleIndices.Add(rIdx + 3); rightMesh.TriangleIndices.Add(rIdx + 1); rightMesh.TriangleIndices.Add(rIdx + 2);
+                    rIdx += 4;
+                }
+            }
+
+            modelGroup.Children.Clear();
+            modelGroup.Children.Add(new AmbientLight(Color.FromRgb(100, 100, 100)));
+            modelGroup.Children.Add(new DirectionalLight(Colors.White, new Vector3D(-0.5, -1, -0.8)));
+
+            Material mat = new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(40, 150, 60)));
+            _previewModel = new GeometryModel3D { Geometry = floorMesh, Material = mat, BackMaterial = mat };
+            modelGroup.Children.Add(_previewModel);
+            modelGroup.Children.Add(new GeometryModel3D { Geometry = ceilMesh, Material = mat, BackMaterial = mat });
+            modelGroup.Children.Add(new GeometryModel3D { Geometry = leftMesh, Material = mat, BackMaterial = mat });
+            modelGroup.Children.Add(new GeometryModel3D { Geometry = rightMesh, Material = mat, BackMaterial = mat });
+
+            _camTarget = new Point3D(target.MinX + (target.WidthX / 2), target.MinY + (target.LengthY / 2), target.MaxZ + (caveHeight + slopeHeight) / 2);
             _camRadius = Math.Max(target.WidthX, target.LengthY) * 1.5;
             UpdateCamera();
         }
