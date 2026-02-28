@@ -37,6 +37,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -106,6 +107,8 @@
                         <ComboBoxItem Content="Slope"/>
                         <ComboBoxItem Content="Volcano (Peak + Crater)"/>
                         <ComboBoxItem Content="Valley (Center Dip)"/>
+                        <ComboBoxItem Content="Tunnel"/>
+                        <ComboBoxItem Content="Slope Tunnel"/>
                     </ComboBox>
                 </StackPanel>
 
@@ -115,13 +118,19 @@
                     <Label Content="(Max height of the macro shape)" Foreground="Gray" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <StackPanel x:Name="panelTerrace" Grid.Row="7" Orientation="Horizontal" Margin="0,0,0,25" Visibility="Collapsed">
+                <StackPanel x:Name="panelTunnelHeight" Grid.Row="7" Orientation="Horizontal" Margin="0,0,0,15" Visibility="Collapsed">
+                    <Label Content="Tunnel Height:" Width="90" VerticalAlignment="Center"/>
+                    <TextBox x:Name="txtTunnelHeight" Text="256" Width="60" VerticalAlignment="Center" Padding="4" TextChanged="UI_Changed"/>
+                    <Label Content="(Height of the tunnel opening)" Foreground="Gray" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel x:Name="panelTerrace" Grid.Row="8" Orientation="Horizontal" Margin="0,0,0,25" Visibility="Collapsed">
                     <Label Content="Terrace Step:" Width="90" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtTerrace" Text="0" Width="60" VerticalAlignment="Center" Padding="4" TextChanged="UI_Changed"/>
                     <Label Content="(0 for smooth, e.g., 32 for stairs)" Foreground="Gray" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="8" Orientation="Horizontal" Margin="0,0,0,15">
+                <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,0,0,15">
                     <Label Content="Noise Type:" Width="90" VerticalAlignment="Center" FontWeight="Bold"/>
                     <ComboBox x:Name="cmbNoiseType" Width="150" SelectedIndex="0" VerticalAlignment="Center" Padding="4" SelectionChanged="UI_Changed">
                         <ComboBoxItem Content="Perlin Noise"/>
@@ -130,13 +139,13 @@
                     </ComboBox>
                 </StackPanel>
 
-                <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="0,0,0,15">
+                <StackPanel Grid.Row="10" Orientation="Horizontal" Margin="0,0,0,15">
                     <Label Content="Variance:" Width="90" VerticalAlignment="Center"/>
                     <TextBox x:Name="txtVariance" Text="32" Width="60" VerticalAlignment="Center" Padding="4" TextChanged="UI_Changed"/>
                     <Label Content="(Max offset of the rocky noise)" Foreground="Gray" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="10" Orientation="Horizontal" Margin="0,0,0,25">
+                <StackPanel Grid.Row="11" Orientation="Horizontal" Margin="0,0,0,25">
                     <Label Content="Frequency:" Width="90" VerticalAlignment="Center"/>
                     <ComboBox x:Name="cmbFrequency" Width="150" IsEditable="True" Text="0.005 (Smooth)" VerticalAlignment="Center" Padding="4" SelectionChanged="UI_Changed" TextBoxBase.TextChanged="UI_Changed">
                         <ComboBoxItem Content="0.001 (Very Smooth)"/>
@@ -146,19 +155,19 @@
                     </ComboBox>
                 </StackPanel>
 
-                <StackPanel x:Name="panelMapName" Grid.Row="11" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,15">
+                <StackPanel x:Name="panelMapName" Grid.Row="12" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,15">
                     <Label Content="Output Name:" Width="90" VerticalAlignment="Center" FontWeight="Bold"/>
                     <TextBox x:Name="txtMapName" Width="260" Text="terrain_output" VerticalAlignment="Center" Padding="4"/>
                     <Label Content=".map" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray"/>
                 </StackPanel>
 
-                <StackPanel Grid.Row="12" Orientation="Horizontal" Margin="0,0,0,15">
+                <StackPanel Grid.Row="13" Orientation="Horizontal" Margin="0,0,0,15">
                     <Button x:Name="btnGenerate" Content="GENERATE" Width="110" Height="40" Background="#FFADD8E6" FontWeight="Bold" Click="BtnGenerate_Click" Margin="0,0,15,0"/>
                     <Button x:Name="btnExport" Content="EXPORT .MAP" Width="120" Height="40" Background="#FF90EE90" FontWeight="Bold" Click="BtnExport_Click" IsEnabled="False"/>
                     <CheckBox x:Name="chkOverrideMap" Content="Override map" VerticalAlignment="Center" Margin="15,0,0,0" Checked="ChkOverrideMap_Changed" Unchecked="ChkOverrideMap_Changed" IsChecked="True"/>
                 </StackPanel>
 
-                <TextBox Grid.Row="13" x:Name="txtLog" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#FFF5F5F5" FontFamily="Consolas" Padding="5"/>
+                <TextBox Grid.Row="14" x:Name="txtLog" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Background="#FFF5F5F5" FontFamily="Consolas" Padding="5"/>
             </Grid>
 
             <Border Grid.Column="3" Background="#FF222222" BorderBrush="Black" BorderThickness="1" Margin="0,20,20,20" ClipToBounds="True">

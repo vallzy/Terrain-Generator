@@ -40,7 +40,7 @@ namespace MapTerrainGeneratorWPF
             string texture = "common/caulk";
             int shapeType = 0; double shapeHeight = 256; double terrace = 0;
             int noiseType = 0; double variance = 32; double frequency = 0.005;
-            bool overrideMap = false;
+            bool overrideMap = false; double tunnelHeight = 256;
 
             // Parse Arguments
             try
@@ -57,9 +57,10 @@ namespace MapTerrainGeneratorWPF
                         case "--subx": subX = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                         case "--suby": subY = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                         case "--texture": texture = args[++i]; break;
+                        case "--tunnelheight": tunnelHeight = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                         case "--shape":
                             string s = args[++i].ToLower();
-                            shapeType = s == "hill" ? 1 : s == "crater" ? 2 : s == "ridge" ? 3 : s == "slope" ? 4 : s == "volcano" ? 5 : s == "valley" ? 6 : 0;
+                            shapeType = s == "hill" ? 1 : s == "crater" ? 2 : s == "ridge" ? 3 : s == "slope" ? 4 : s == "volcano" ? 5 : s == "valley" ? 6 : s == "cave" ? 7 : s == "slopetunnel" ? 8 : 0;
                             break;
                         case "--shapeheight": shapeHeight = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                         case "--terrace": terrace = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
@@ -83,7 +84,7 @@ namespace MapTerrainGeneratorWPF
                 TerrainEngine.GenerateAndExport(
                     mode, file, width, length, height, subX, subY, texture,
                     shapeType, shapeHeight, terrace, noiseType, variance, frequency,
-                    output, overrideMap, logger);
+                    output, overrideMap, logger, tunnelHeight);
             }
             catch (Exception ex)
             {
@@ -103,8 +104,9 @@ namespace MapTerrainGeneratorWPF
             Console.WriteLine("  --subX <num>             : Sub-square size X (e.g. 64)");
             Console.WriteLine("  --subY <num>             : Sub-square size Y (e.g. 64)");
             Console.WriteLine("  --texture <name>         : Terrain face texture");
-            Console.WriteLine("  --shape <type>           : flat, hill, crater, ridge, slope, volcano, valley");
-            Console.WriteLine("  --shapeHeight <num>      : Peak/Depth height offset");
+            Console.WriteLine("  --shape <type>           : flat, hill, crater, ridge, slope, volcano, valley, cave, slopetunnel");
+            Console.WriteLine("  --shapeHeight <num>      : Peak/Depth/Slope height offset");
+            Console.WriteLine("  --tunnelHeight <num>     : Tunnel opening height (for slopetunnel)");
             Console.WriteLine("  --terrace <num>          : Z-height stair stepping (0 for smooth)");
             Console.WriteLine("  --noise <type>           : perlin, simplex, random");
             Console.WriteLine("  --variance <num>         : Max noise offset");
