@@ -51,8 +51,9 @@
 
                 <StackPanel x:Name="panelMapFile" Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,15">
                     <Label Content="Map File:" Width="90" VerticalAlignment="Center" FontWeight="Bold"/>
-                    <TextBox x:Name="txtFile" Width="260" VerticalAlignment="Center" Padding="4" TextChanged="TxtFile_TextChanged"/>
-                    <Button x:Name="btnBrowse" Content="Browse" Width="70" Margin="10,0,0,0" Padding="4" Click="BtnBrowse_Click"/>
+                    <TextBox x:Name="txtFile" Width="220" VerticalAlignment="Center" Padding="4" TextChanged="TxtFile_TextChanged"/>
+                    <Button x:Name="btnAutoDetect" Content="Detect" Width="55" Margin="5,0,0,0" Padding="4" ToolTip="Detect open map in Radiant" Click="BtnAutoDetect_Click"/>
+                    <Button x:Name="btnBrowse" Content="Browse" Width="55" Margin="5,0,0,0" Padding="4" Click="BtnBrowse_Click"/>
                 </StackPanel>
 
                 <StackPanel x:Name="panelManualSize" Grid.Row="2" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,15">

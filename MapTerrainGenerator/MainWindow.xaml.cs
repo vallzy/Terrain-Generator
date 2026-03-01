@@ -1,15 +1,34 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
+using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-using Microsoft.Win32;
 
 namespace MapTerrainGeneratorWPF
 {
     public partial class MainWindow : Window
     {
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetWindowTextLength(IntPtr hWnd);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
         private bool _isDragging = false;
         private Point _lastMousePosition;
         private double _camRadius = 1000;
@@ -30,6 +49,59 @@ namespace MapTerrainGeneratorWPF
             InitializeComponent();
             _appSettings = ConfigSettings.Load();
             ApplySettings();
+        }
+
+        private string FindRadiantMapPath()
+        {
+            var processes = new System.Collections.Generic.List<Process>();
+            processes.AddRange(Process.GetProcessesByName("radiant"));
+            processes.AddRange(Process.GetProcessesByName("GtkRadiant"));
+            processes.AddRange(Process.GetProcessesByName("NetRadiant"));
+
+            if (processes.Count == 0) return null;
+
+            string foundPath = null;
+
+            Regex pathRegex = new Regex(@"[a-zA-Z]:[\\/](?:[^<>:""|?*]+[\\/])*[^<>:""|?*]+\.map", RegexOptions.IgnoreCase);
+
+            foreach (var proc in processes)
+            {
+                Match match = pathRegex.Match(proc.MainWindowTitle);
+                if (match.Success && ValidatePath(match.Value, out foundPath))
+                    return foundPath;
+
+                EnumWindows((hWnd, lParam) =>
+                {
+                    GetWindowThreadProcessId(hWnd, out uint windowPid);
+                    if (windowPid == proc.Id)
+                    {
+                        int length = GetWindowTextLength(hWnd);
+                        if (length > 0)
+                        {
+                            StringBuilder sb = new StringBuilder(length + 1);
+                            GetWindowText(hWnd, sb, sb.Capacity);
+
+                            Match winMatch = pathRegex.Match(sb.ToString());
+                            if (winMatch.Success && ValidatePath(winMatch.Value, out foundPath))
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                    return true; 
+                }, IntPtr.Zero);
+
+                if (foundPath != null) break;
+            }
+
+            return foundPath;
+        }
+
+        private bool ValidatePath(string rawPath, out string cleanPath)
+        {
+            // Radiant usually displays paths with forward slashes; normalize it for Windows
+            cleanPath = rawPath.Replace("/", "\\");
+            return File.Exists(cleanPath);
         }
 
         private void Log(string msg)
@@ -57,6 +129,25 @@ namespace MapTerrainGeneratorWPF
                 _appSettings = configWin.Settings;
                 ApplySettings();
                 Log("Configuration updated and saved.");
+            }
+        }
+
+        private void BtnAutoDetect_Click(object sender, RoutedEventArgs e)
+        {
+            string activeMap = FindRadiantMapPath();
+
+            if (!string.IsNullOrEmpty(activeMap))
+            {
+                txtFile.Text = activeMap;
+                Log($"Auto-detected active map: {activeMap}");
+            }
+            else
+            {
+                MessageBox.Show(
+                    "Could not detect an open .map file in Radiant.\n\nPlease ensure Radiant is running, a map is loaded, and try again.",
+                    "Detection Failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
         }
 
