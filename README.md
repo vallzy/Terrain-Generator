@@ -16,13 +16,13 @@
 ## Getting Started
 
 ### Prerequisites
-* [.NET 6.0 SDK](https://dotnet.microsoft.com/download/dotnet/6.0) or higher.
+* [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or higher.
 * Windows 10/11 (for the WPF GUI).
 
 ### Installation & Build
 1.  **Clone the repository:**
     ```bash
-    git clone [https://github.com/YourUsername/RadiantTerrainGenerator.git](https://github.com/YourUsername/RadiantTerrainGenerator.git)
+    git clone https://github.com/vallzy/Terrain-Generator.git
     ```
 2.  **Build the project:**
     ```bash
