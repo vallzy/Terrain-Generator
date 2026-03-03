@@ -6,9 +6,10 @@
 * **Asset Management & Texture Browser:** Directly mounts and reads from `.pk3` archives and physical directories. Includes a custom interface with hierarchical grouping, a "Favorites" system, and options to set a default texture or view raw shader information.
 * **Persistent Configuration:** A dedicated configuration window lets you set and save your Game Data Path, Default Output Folder, and Default Target Mode so you don't have to re-enter them every session.
 * **CSG Math Library:** Automatically derives 3D bounding boxes by calculating the intersection of infinite planes—perfect for accurate editor placement.
-* **Procedural Landforms & Interiors:** Built-in macro shapes including Hill, Crater, Ridge, Slope, Volcano, Valley, Tunnel, and Slope Tunnel. The interior generators calculate fully enclosed, seamless cave meshes with matching floor, ceiling, and wall heightmaps.
+* **Auto-Detection:** When a `.map` file is loaded, the generator automatically detects and selects the hint brush `func_group`, so no manual searching is required.
+* **Procedural Landforms & Interiors:** Built-in macro shapes including Hill, Crater, Ridge, Slope, Volcano, Valley, Tunnel, and Slope Tunnel. The interior generators calculate fully enclosed, seamless cave meshes with matching floor, ceiling, and wall heightmaps — each with proper solid thickness above the ceiling and below the floor.
 * **Noise Layers:** Overlay Perlin, Simplex, or Random noise with adjustable frequency and variance.
-* **Strict Grid Alignment:** Automatically snaps terrain bounds to fit sub-square sizes, preventing micro-leaks and ensuring perfect integer alignment in Radiant.
+* **Strict Integer Grid Alignment:** All vertex Z (and wall X) coordinates are snapped to whole numbers, guaranteeing perfect grid alignment in Radiant and making manual brush editing straightforward.
 * **Advanced Modifiers:** Includes a **Terrace Step** feature for creating tiered, Minecraft-style, or "staircase" terrain.
 
 ---
@@ -38,15 +39,15 @@
 
 ## Quick Start Guide
 
-The generator operates in two primary modes to define the 3D volume of your terrain: **Manual** and **Use .map Hint Brush**. 
+The generator operates in two primary modes to define the 3D volume of your terrain: **Manual** and **Use .map Hint Brush**.
 
 **Using an existing .map file (Hint Brush Mode):**
-If you choose to inject terrain directly into an existing `.map` file, **the program expects the `.map` to have a single hint brush tied to a `func_group` entity**. 
+If you choose to inject terrain directly into an existing `.map` file, **the program expects the `.map` to have a single hint brush tied to a `func_group` entity**.
 1. Open your map in Radiant.
 2. Draw a brush that represents the exact bounding box (width, length, and max height) of your desired terrain.
 3. Apply the `common/hint` texture to all faces of this brush.
 4. Select the brush and turn it into a `func_group` (Right Click -> `func_group`). Ensure no other brushes are in this specific `func_group`.
-5. Save your map and run it through the Terrain Generator. The program will automatically find this brush, calculate its 3D volume, and replace it with the generated procedural terrain.
+5. Save your map and run it through the Terrain Generator. The program will automatically detect and select this brush, calculate its 3D volume, and replace it with the generated procedural terrain.
 
 **Using Manual Mode:**
 If you just want to generate a standalone prefab block of terrain, select "Manual Size" and input your desired Width, Length, and Height. The terrain will be generated centered at world origin `(0,0,0)`.
@@ -80,17 +81,38 @@ The tool operates as a powerful headless utility when arguments are passed.
 | `--subx / --suby` | `Power of 2` | Resolution of the terrain grid |
 | `--shape` | `hill`, `crater`, `ridge`, `slope`, `volcano`, `valley`, `cave`, `slopetunnel` | The base macro shape |
 | `--shapeheight` | `Number` | The height/depth of the macro shape landform |
-| `--tunnelheight` | `Number` | Tunnel opening height (specifically for `slopetunnel`) |
+| `--tunnelheight` | `Number` | Tunnel opening height for `slopetunnel` (the `cave` shape uses `--shapeheight` as its tunnel height) |
 | `--noise` | `perlin`, `simplex`, `random` | The procedural noise algorithm |
-| `--variance` | `Number` | Maximum vertical noise offset |
-| `--frequency` | `Number` | Scale of noise (e.g., `0.005`) |
-| `--terrace` | `Number` | Z-height step increments (0 for smooth) |
+| `--variance` | `Number` | Maximum noise offset applied to each vertex |
+| `--frequency` | `Number` | Scale of noise (e.g., `0.005` for broad sweeping, `0.02` for fine detail) |
+| `--terrace` | `Number` | Snaps Z values to increments of this size (0 for smooth) |
 | `--texture` | `Name` | The Radiant texture for the top faces |
 | `--override` | `Flag` | Overwrites the input file (Hint mode only) |
 | `--out` | `Name` | Custom filename for the output |
 
 ### CLI Examples
 
-**Standalone Valley Generation:**
+**Standalone valley with Perlin noise:**
 ```powershell
-./MapTerrainGenerator.exe --mode manual --width 4096 --length 4096 --shape valley --shapeheight 512 --out my_valley_map
+./MapTerrainGenerator.exe --mode manual --width 1024 --length 1024 --height 64 --shape valley --shapeheight 128 --noise perlin --variance 16 --frequency 0.008 --out valley_output
+```
+
+**Hill injected into an existing map, overriding the source file:**
+```powershell
+./MapTerrainGenerator.exe --mode hint --file "C:/maps/mymap.map" --shape hill --shapeheight 256 --noise simplex --variance 32 --frequency 0.005 --texture terrain/grass --override
+```
+
+**Terraced crater (Minecraft-style stepped terrain):**
+```powershell
+./MapTerrainGenerator.exe --mode manual --width 2048 --length 2048 --height 64 --shape crater --shapeheight 192 --terrace 32 --out crater_terraced
+```
+
+**Tunnel cave with noise variance:**
+```powershell
+./MapTerrainGenerator.exe --mode manual --width 1024 --length 2048 --height 64 --shape cave --shapeheight 192 --noise perlin --variance 24 --frequency 0.01 --out tunnel_output
+```
+
+**Slope tunnel (rising floor, noisy walls):**
+```powershell
+./MapTerrainGenerator.exe --mode manual --width 1024 --length 2048 --height 64 --shape slopetunnel --shapeheight 128 --tunnelheight 192 --noise simplex --variance 20 --frequency 0.008 --out slope_tunnel
+```

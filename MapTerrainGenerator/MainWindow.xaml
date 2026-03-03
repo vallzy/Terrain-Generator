@@ -58,13 +58,13 @@
 
                 <StackPanel x:Name="panelManualSize" Grid.Row="2" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,0,15">
                     <Label Content="Width (X):" Width="70" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtGenWidth" Width="60" Text="2048" Padding="4" TextChanged="UI_Changed"/>
+                    <TextBox x:Name="txtGenWidth" Width="60" Text="1024" Padding="4" TextChanged="UI_Changed"/>
 
                     <Label Content="Length (Y):" Width="70" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtGenLength" Width="60" Text="2048" Padding="4" TextChanged="UI_Changed"/>
+                    <TextBox x:Name="txtGenLength" Width="60" Text="1024" Padding="4" TextChanged="UI_Changed"/>
 
                     <Label Content="Height (Z):" Width="70" Margin="15,0,0,0" VerticalAlignment="Center"/>
-                    <TextBox x:Name="txtGenHeight" Width="60" Text="256" Padding="4" TextChanged="UI_Changed"/>
+                    <TextBox x:Name="txtGenHeight" Width="60" Text="64" Padding="4" TextChanged="UI_Changed"/>
                 </StackPanel>
 
                 <StackPanel Grid.Row="3" Orientation="Vertical" Margin="0,0,0,15">

@@ -149,7 +149,7 @@ namespace MapTerrainGeneratorWPF
 
                     double finalZ = target.MaxZ + baseShapeZ + noiseZ;
                     if (shapeType > 0 && terraceStep > 0) finalZ = Math.Floor(finalZ / terraceStep) * terraceStep;
-                    heightMap[(Math.Round(x, 2), Math.Round(y, 2))] = finalZ;
+                    heightMap[(Math.Round(x, 2), Math.Round(y, 2))] = Math.Round(finalZ);
                 }
             }
             return heightMap;
@@ -217,8 +217,8 @@ namespace MapTerrainGeneratorWPF
                         ceilZ = Math.Ceiling(ceilZ / terraceStep) * terraceStep;
                     }
 
-                    floorMap[(Math.Round(x, 2), Math.Round(y, 2))] = floorZ;
-                    ceilingMap[(Math.Round(x, 2), Math.Round(y, 2))] = ceilZ;
+                    floorMap[(Math.Round(x, 2), Math.Round(y, 2))] = Math.Round(floorZ);
+                    ceilingMap[(Math.Round(x, 2), Math.Round(y, 2))] = Math.Round(ceilZ);
                 }
             }
 
@@ -243,7 +243,7 @@ namespace MapTerrainGeneratorWPF
                         else if (noiseType == 1) wallNoise = Math.Abs(Simplex.Noise((y + seedWallL) * frequency, (z + seedWallL) * frequency)) * variance;
                         else if (noiseType == 2) wallNoise = rnd.NextDouble() * variance;
                     }
-                    leftWallMap[(ry, rz)] = target.MinX + wallNoise;
+                    leftWallMap[(ry, rz)] = Math.Round(target.MinX + wallNoise);
 
                     wallNoise = 0;
                     if (variance > 0)
@@ -252,7 +252,7 @@ namespace MapTerrainGeneratorWPF
                         else if (noiseType == 1) wallNoise = Math.Abs(Simplex.Noise((y + seedWallR) * frequency, (z + seedWallR) * frequency)) * variance;
                         else if (noiseType == 2) wallNoise = rnd.NextDouble() * variance;
                     }
-                    rightWallMap[(ry, rz)] = target.MaxX - wallNoise;
+                    rightWallMap[(ry, rz)] = Math.Round(target.MaxX - wallNoise);
                 }
             }
 
@@ -276,6 +276,7 @@ namespace MapTerrainGeneratorWPF
             int fBrush = 0, cBrush = 0, lwBrush = 0, rwBrush = 0;
             double minZ = originalBrush.MinZ;
             double maxCeilZ = originalBrush.MaxZ + caveHeight + slopeHeight;
+            double ceilSolidTop = maxCeilZ + originalBrush.HeightZ;
             string caulkTex = "common/caulk 0 0 0";
             string topTex = $"{topTexture} 0 0 0";
             string matrix = "( ( 0.03125 0 0 ) ( 0 0.03125 0 ) )";
@@ -319,19 +320,19 @@ namespace MapTerrainGeneratorWPF
                     // Ceiling triangle 1 (reversed floor: solid above, textured face visible from below)
                     sbCeiling.AppendLine($"// brush {cBrush++}\n{{\nbrushDef\n{{");
                     sbCeiling.AppendLine($"( {x} {y} {cBL} ) ( {currentMaxX} {y} {cBR} ) ( {x} {currentMaxY} {cTL} ) {matrix} {topTex}");
-                    sbCeiling.AppendLine($"( {x} {y} {maxCeilZ} ) ( {x} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {maxCeilZ} ) {matrix} {caulkTex}");
-                    sbCeiling.AppendLine($"( {x} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {x} {y} {maxCeilZ} ) {matrix} {caulkTex}");
-                    sbCeiling.AppendLine($"( {x} {y} {minZ} ) ( {x} {y} {maxCeilZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
-                    sbCeiling.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {y} {ceilSolidTop} ) ( {x} {currentMaxY} {ceilSolidTop} ) ( {currentMaxX} {y} {ceilSolidTop} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {x} {y} {ceilSolidTop} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {y} {minZ} ) ( {x} {y} {ceilSolidTop} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {ceilSolidTop} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
                     sbCeiling.AppendLine("}\n}");
 
                     // Ceiling triangle 2 (reversed floor)
                     sbCeiling.AppendLine($"// brush {cBrush++}\n{{\nbrushDef\n{{");
                     sbCeiling.AppendLine($"( {currentMaxX} {currentMaxY} {cTR} ) ( {x} {currentMaxY} {cTL} ) ( {currentMaxX} {y} {cBR} ) {matrix} {topTex}");
-                    sbCeiling.AppendLine($"( {currentMaxX} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {x} {currentMaxY} {maxCeilZ} ) {matrix} {caulkTex}");
-                    sbCeiling.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {maxCeilZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
-                    sbCeiling.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {maxCeilZ} ) {matrix} {caulkTex}");
-                    sbCeiling.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {maxCeilZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {currentMaxX} {currentMaxY} {ceilSolidTop} ) ( {currentMaxX} {y} {ceilSolidTop} ) ( {x} {currentMaxY} {ceilSolidTop} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {ceilSolidTop} ) ( {currentMaxX} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {ceilSolidTop} ) {matrix} {caulkTex}");
+                    sbCeiling.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {ceilSolidTop} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
                     sbCeiling.AppendLine("}\n}");
                 }
             }
