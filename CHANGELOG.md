@@ -6,16 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [1.2.0]
 
 ### Added
 - Integer grid alignment for all vertex deformation types — all Z (and wall X) coordinates are now snapped to whole numbers via `Math.Round`, guaranteeing brushes are always on the Radiant grid regardless of noise or shape settings.
 - Tunnel ceiling brushes now have a solid cap of `HeightZ` units above the cave ceiling surface, matching the solid thickness of the floor, so ceilings are no longer paper-thin at the tunnel center.
 - Auto-detection for hint brush `func_group` when loading a `.map` file — no manual selection required.
-- Manual mode default dimensions changed to 1024 × 1024 × 64 for more practical out-of-the-box results.
+- Added an about window with credits to the developers.
+- Added an icon to the application.
 
 ### Changed
 - README overhauled: completed the cut-off CLI examples section, added five full usage examples covering valley, hill, crater, tunnel, and slope tunnel shapes, documented auto-detection, and clarified `--tunnelheight` usage for both tunnel types.
+- Fixed an issue where the regional keyboard settings changed periods to commas, which caused Radiant to fail to generate acceptable map files.
+- Default mode changed to Manual.
+- Manual mode default dimensions changed to 1024 × 1024 × 64 for more practical out-of-the-box results.
 
 ---
 

@@ -21,8 +21,8 @@
             </DockPanel>
             <Label Content="Default Target Mode:" FontWeight="Bold"/>
             <ComboBox x:Name="cmbDefTarget" Margin="0,0,0,15" Padding="3">
-                <ComboBoxItem Content="Use .map Hint Brush"/>
                 <ComboBoxItem Content="Manual Size"/>
+                <ComboBoxItem Content="Use .map Hint Brush"/>
             </ComboBox>
 
             <Label Content="Default Noise Type:" FontWeight="Bold"/>

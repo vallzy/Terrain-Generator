@@ -11,7 +11,8 @@
                 <MenuItem Header="Configuration" Click="MenuConfig_Click"/>
             </MenuItem>
             <MenuItem Header="_Help">
-                <MenuItem Header="GitHub" Click="MenuGithub_Click"/>
+                <MenuItem Header="About..." Click="MenuAbout_Click"/>
+                <MenuItem Header="GitHub Repository" Click="MenuGithub_Click"/>
             </MenuItem>
         </Menu>
         <Grid>

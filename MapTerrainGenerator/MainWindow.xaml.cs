@@ -614,5 +614,12 @@ namespace MapTerrainGeneratorWPF
             cameraPreview.LookDirection = new Vector3D(_camTarget.X - x, _camTarget.Y - y, _camTarget.Z - z);
             cameraPreview.UpDirection = new Vector3D(0, 0, 1);
         }
+
+        private void MenuAbout_Click(object sender, RoutedEventArgs e)
+        {
+            var aboutWin = new AboutWindow();
+            aboutWin.Owner = this;
+            aboutWin.ShowDialog();
+        }
     }
 }
