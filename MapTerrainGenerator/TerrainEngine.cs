@@ -15,6 +15,8 @@ namespace MapTerrainGeneratorWPF
             double terraceStep, int noiseType, double variance, double frequency,
             string outputName, bool overrideMap, Action<string> log, double tunnelHeight = 0)
         {
+            var originalCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
             try
             {
                 string[] originalLines = new string[0];
@@ -56,6 +58,10 @@ namespace MapTerrainGeneratorWPF
             {
                 log($"Critical Error: {ex.Message}");
                 return false;
+            }
+            finally
+            {
+                System.Threading.Thread.CurrentThread.CurrentCulture = originalCulture;
             }
         }
 
@@ -440,6 +446,8 @@ namespace MapTerrainGeneratorWPF
             string topTex = $"{topTexture} 0 0 0";
             string matrix = "( ( 0.03125 0 0 ) ( 0 0.03125 0 ) )";
 
+            Func<double, string> f = val => val.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+
             for (double x = originalBrush.MinX; x < originalBrush.MaxX - 0.01; x += stepX)
             {
                 for (double y = originalBrush.MinY; y < originalBrush.MaxY - 0.01; y += stepY)
@@ -455,30 +463,30 @@ namespace MapTerrainGeneratorWPF
                     if (!splitDiagonally)
                     {
                         sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
-                        sb.AppendLine($"( {x} {y} {baseMaxZ} ) ( {x} {currentMaxY} {baseMaxZ} ) ( {currentMaxX} {y} {baseMaxZ} ) {matrix} {topTex}");
-                        sb.AppendLine($"( {x} {y} {minZ} ) ( {currentMaxX} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {baseMaxZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {x} {y} {baseMaxZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {baseMaxZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {y} {minZ} ) ( {x} {y} {baseMaxZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(baseMaxZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) {matrix} {topTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
                         sb.AppendLine("}\n}");
                     }
                     else
                     {
                         sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
-                        sb.AppendLine($"( {x} {y} {zBL} ) ( {x} {currentMaxY} {zTL} ) ( {currentMaxX} {y} {zBR} ) {matrix} {topTex}");
-                        sb.AppendLine($"( {x} {y} {minZ} ) ( {currentMaxX} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {y} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {x} {y} {baseMaxZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {y} {minZ} ) ( {x} {y} {baseMaxZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {baseMaxZ} ) ( {x} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(zBL)} ) ( {f(x)} {f(currentMaxY)} {f(zTL)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) {matrix} {topTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
                         sb.AppendLine("}\n}");
 
                         sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
-                        sb.AppendLine($"( {currentMaxX} {currentMaxY} {zTR} ) ( {currentMaxX} {y} {zBR} ) ( {x} {currentMaxY} {zTL} ) {matrix} {topTex}");
-                        sb.AppendLine($"( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {currentMaxX} {y} {minZ} ) ( {currentMaxX} {y} {baseMaxZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {currentMaxX} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {baseMaxZ} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {x} {currentMaxY} {minZ} ) ( {x} {currentMaxY} {baseMaxZ} ) ( {currentMaxX} {y} {minZ} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(zTR)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) ( {f(x)} {f(currentMaxY)} {f(zTL)} ) {matrix} {topTex}");
+                        sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                        sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
                         sb.AppendLine("}\n}");
                     }
                 }
