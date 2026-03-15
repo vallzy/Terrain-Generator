@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,7 +13,7 @@ namespace MapTerrainGeneratorWPF
             string mode, string filePath, double manWidth, double manLength, double manHeight,
             double stepX, double stepY, string topTexture, int shapeType, double shapeHeight,
             double terraceStep, int noiseType, double variance, double frequency,
-            string outputName, bool overrideMap, Action<string> log, double tunnelHeight = 0)
+            string outputName, bool overrideMap, bool invertXY, Action<string> log, double tunnelHeight = 0)
         {
             var originalCulture = System.Threading.Thread.CurrentThread.CurrentCulture;
             System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
@@ -33,6 +33,21 @@ namespace MapTerrainGeneratorWPF
 
                 var target = GetTargetBrushData(mode, originalLines, manWidth, manLength, manHeight, log);
                 if (target == null) return false;
+
+                if (invertXY)
+                {
+                    double tempWidth = target.WidthX;
+                    target.WidthX = target.LengthY;
+                    target.LengthY = tempWidth;
+
+                    double centerX = (target.MinX + target.MaxX) / 2.0;
+                    double centerY = (target.MinY + target.MaxY) / 2.0;
+
+                    target.MinX = Math.Round(centerX - target.WidthX / 2.0);
+                    target.MaxX = Math.Round(centerX + target.WidthX / 2.0);
+                    target.MinY = Math.Round(centerY - target.LengthY / 2.0);
+                    target.MaxY = Math.Round(centerY + target.LengthY / 2.0);
+                }
 
                 AdjustBoundsToFitGrid(target, stepX, stepY, log);
                 log($"Final Terrain Grid: {target.WidthX}x{target.LengthY} | Step Size: X:{stepX} Y:{stepY}");
@@ -448,8 +463,10 @@ namespace MapTerrainGeneratorWPF
 
             Func<double, string> f = val => val.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
 
+            int xIndex = 0;
             for (double x = originalBrush.MinX; x < originalBrush.MaxX - 0.01; x += stepX)
             {
+                int yIndex = 0;
                 for (double y = originalBrush.MinY; y < originalBrush.MaxY - 0.01; y += stepY)
                 {
                     double currentMaxX = Math.Min(x + stepX, originalBrush.MaxX);
@@ -459,6 +476,8 @@ namespace MapTerrainGeneratorWPF
                     double zTL = heightMap[(Math.Round(x, 2), Math.Round(currentMaxY, 2))];
                     double zBR = heightMap[(Math.Round(currentMaxX, 2), Math.Round(y, 2))];
                     double zTR = heightMap[(Math.Round(currentMaxX, 2), Math.Round(currentMaxY, 2))];
+
+                    bool altDir = ((xIndex + yIndex) % 2) != 0;
 
                     if (!splitDiagonally)
                     {
@@ -473,23 +492,46 @@ namespace MapTerrainGeneratorWPF
                     }
                     else
                     {
-                        sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
-                        sb.AppendLine($"( {f(x)} {f(y)} {f(zBL)} ) ( {f(x)} {f(currentMaxY)} {f(zTL)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) {matrix} {topTex}");
-                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine("}\n}");
+                        if (!altDir)
+                        {
+                            sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(zBL)} ) ( {f(x)} {f(currentMaxY)} {f(zTL)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) {matrix} {topTex}");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine("}\n}");
 
-                        sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
-                        sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(zTR)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) ( {f(x)} {f(currentMaxY)} {f(zTL)} ) {matrix} {topTex}");
-                        sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
-                        sb.AppendLine("}\n}");
+                            sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(zTR)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) ( {f(x)} {f(currentMaxY)} {f(zTL)} ) {matrix} {topTex}");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine("}\n}");
+                        }
+                        else
+                        {
+                            sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
+                            sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(zTL)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(zTR)} ) ( {f(x)} {f(y)} {f(zBL)} ) {matrix} {topTex}");
+                            sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(currentMaxY)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(currentMaxY)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine("}\n}");
+
+                            sb.AppendLine($"// brush {brushCount++}\n{{\nbrushDef\n{{");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(zTR)} ) ( {f(currentMaxX)} {f(y)} {f(zBR)} ) ( {f(x)} {f(y)} {f(zBL)} ) {matrix} {topTex}");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(currentMaxX)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) ( {f(currentMaxX)} {f(y)} {f(minZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine($"( {f(x)} {f(y)} {f(minZ)} ) ( {f(currentMaxX)} {f(currentMaxY)} {f(minZ)} ) ( {f(x)} {f(y)} {f(baseMaxZ)} ) {matrix} {caulkTex}");
+                            sb.AppendLine("}\n}");
+                        }
                     }
+                    yIndex++;
                 }
+                xIndex++;
             }
             sb.AppendLine("}");
             return sb.ToString().TrimEnd();
@@ -503,9 +545,9 @@ namespace MapTerrainGeneratorWPF
          string sourceFilePath,
          string outName,
          bool overrideMap,
-         string configOutputFolder, 
-         Action<string> log)       
-            {
+         string configOutputFolder,
+         Action<string> log)
+        {
             try
             {
                 List<string> newFileLines = new List<string>();
@@ -658,7 +700,7 @@ namespace MapTerrainGeneratorWPF
     public static class Simplex
     {
         private static readonly int[] perm = new int[512];
-        private static readonly int[] p = { 
+        private static readonly int[] p = {
             151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,8,99,37,240,21,10,23,
             190, 6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168, 68,175,74,165,71,134,139,48,27,166,
             77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,46,245,40,244,102,143,54, 65,25,63,161, 1,216,80,73,209,76,132,187,208, 89,18,169,200,196,

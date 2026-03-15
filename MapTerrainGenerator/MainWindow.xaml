@@ -1,4 +1,4 @@
-﻿<Window x:Class="MapTerrainGeneratorWPF.MainWindow"
+<Window x:Class="MapTerrainGeneratorWPF.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Radiant Terrain Generator" Height="720" Width="950" WindowStartupLocation="CenterScreen">
@@ -193,7 +193,10 @@
                     </Viewport3D>
 
                     <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10" Background="#99000000" Padding="6,4" CornerRadius="3">
-                        <CheckBox x:Name="chkWireframe" Content="Wireframe" Foreground="White" Background="White" BorderBrush="White" VerticalContentAlignment="Center" IsChecked="True" Checked="ChkWireframe_Changed" Unchecked="ChkWireframe_Changed"/>
+                        <StackPanel Orientation="Vertical">
+                            <CheckBox x:Name="chkWireframe" Content="Wireframe" Foreground="White" Margin="0,0,0,5" VerticalContentAlignment="Center" IsChecked="True" Checked="ChkWireframe_Changed" Unchecked="ChkWireframe_Changed"/>
+                            <CheckBox x:Name="chkInvertXY" Content="Invert X/Y" Foreground="White" VerticalContentAlignment="Center" ToolTip="Inverts the X and Y dimensions (Width and Length) of the generated terrain." Checked="UI_Changed"/>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Border>

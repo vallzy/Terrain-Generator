@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -88,7 +88,7 @@ namespace MapTerrainGeneratorWPF
                             }
                         }
                     }
-                    return true; 
+                    return true;
                 }, IntPtr.Zero);
 
                 if (foundPath != null) break;
@@ -160,7 +160,7 @@ namespace MapTerrainGeneratorWPF
             if (browserWin.ShowDialog() == true)
             {
                 txtTexture.Text = browserWin.SelectedTexturePath;
-                _appSettings = browserWin.Settings; 
+                _appSettings = browserWin.Settings;
                 _appSettings.Save();
             }
         }
@@ -258,9 +258,9 @@ namespace MapTerrainGeneratorWPF
                     MenuConfig_Click(null, null);
                     return !string.IsNullOrWhiteSpace(_appSettings.GameDataPath);
                 }
-                return false; 
+                return false;
             }
-            return true; 
+            return true;
         }
 
         private void ChkAdvancedSubSquare_Changed(object sender, RoutedEventArgs e)
@@ -321,8 +321,25 @@ namespace MapTerrainGeneratorWPF
             int shapeType = cmbShapeType.SelectedIndex;
             int noiseType = cmbNoiseType.SelectedIndex;
 
+            bool invertXY = chkInvertXY.IsChecked == true;
+
             var target = TerrainEngine.GetTargetBrushData(mode, originalLines, w, l, h, Log);
             if (target == null) return;
+
+            if (invertXY)
+            {
+                double tempWidth = target.WidthX;
+                target.WidthX = target.LengthY;
+                target.LengthY = tempWidth;
+
+                double centerX = (target.MinX + target.MaxX) / 2.0;
+                double centerY = (target.MinY + target.MaxY) / 2.0;
+
+                target.MinX = Math.Round(centerX - target.WidthX / 2.0);
+                target.MaxX = Math.Round(centerX + target.WidthX / 2.0);
+                target.MinY = Math.Round(centerY - target.LengthY / 2.0);
+                target.MaxY = Math.Round(centerY + target.LengthY / 2.0);
+            }
 
             TerrainEngine.AdjustBoundsToFitGrid(target, stepX, stepY, Log);
             Log($"Final Terrain Grid: {target.WidthX}x{target.LengthY} | Step Size: X:{stepX} Y:{stepY}");
@@ -506,15 +523,15 @@ namespace MapTerrainGeneratorWPF
             string mode = cmbTargetMode.SelectedIndex == 0 ? "hint" : "manual";
 
             TerrainEngine.ExportFile(
-                mode,                           
-                _lastOriginalLines,             
-                _lastTargetBrush,              
-                _lastGeneratedFuncGroup,        
-                txtFile.Text,                  
-                txtMapName.Text,                
-                chkOverrideMap.IsChecked == true, 
-                _appSettings.OutputFolder,      
-                Log                            
+                mode,
+                _lastOriginalLines,
+                _lastTargetBrush,
+                _lastGeneratedFuncGroup,
+                txtFile.Text,
+                txtMapName.Text,
+                chkOverrideMap.IsChecked == true,
+                _appSettings.OutputFolder,
+                Log
             );
         }
 

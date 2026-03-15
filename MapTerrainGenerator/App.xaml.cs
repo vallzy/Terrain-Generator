@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -40,7 +40,7 @@ namespace MapTerrainGeneratorWPF
             string texture = "common/caulk";
             int shapeType = 0; double shapeHeight = 256; double terrace = 0;
             int noiseType = 0; double variance = 32; double frequency = 0.005;
-            bool overrideMap = false; double tunnelHeight = 256;
+            bool overrideMap = false; double tunnelHeight = 256; bool invertXY = false;
 
             // Parse Arguments
             try
@@ -72,6 +72,7 @@ namespace MapTerrainGeneratorWPF
                         case "--frequency": frequency = double.Parse(args[++i], CultureInfo.InvariantCulture); break;
                         case "--out": output = args[++i]; break;
                         case "--override": overrideMap = true; break;
+                        case "--invert": invertXY = true; break;
                         case "--help":
                             PrintHelp();
                             return;
@@ -84,7 +85,7 @@ namespace MapTerrainGeneratorWPF
                 TerrainEngine.GenerateAndExport(
                     mode, file, width, length, height, subX, subY, texture,
                     shapeType, shapeHeight, terrace, noiseType, variance, frequency,
-                    output, overrideMap, logger, tunnelHeight);
+                    output, overrideMap, invertXY, logger, tunnelHeight);
             }
             catch (Exception ex)
             {
@@ -113,6 +114,7 @@ namespace MapTerrainGeneratorWPF
             Console.WriteLine("  --frequency <num>        : Noise scaling factor (e.g. 0.005)");
             Console.WriteLine("  --out <name>             : Output map name (if not overriding)");
             Console.WriteLine("  --override               : Flag to overwrite target .map in hint mode");
+            Console.WriteLine("  --invert                 : Flag to invert the X and Y bounds of the generated terrain");
         }
     }
 }
